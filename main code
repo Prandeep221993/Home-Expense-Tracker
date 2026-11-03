@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Household Expense Tracker</title>
+    <!-- Supabase JS Client for 2-Person Realtime Sync -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --success-hover: #15803d;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --radius: 8px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text-dark); padding: 1.5rem; }
+        .container { max-width: 1050px; margin: 0 auto; }
+
+        header { margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; }
+        h1 { font-size: 1.75rem; font-weight: 700; }
+        
+        .header-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .btn-action { padding: 0.5rem 0.85rem; border-radius: 6px; font-size: 0.85rem; font-weight: 600; cursor: pointer; border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.2s; }
+        .btn-export { background: #ecfdf5; color: var(--success); border-color: #a7f3d0; }
+        .btn-export:hover { background: #d1fae5; }
+        .btn-archive { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+        .btn-archive:hover { background: #fef3c7; }
+
+        /* Month Filter Bar */
+        .filter-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1.25rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem; }
+        .filter-bar label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+        .filter-bar select { width: auto; padding: 0.4rem 0.8rem; border: 1px solid var(--border); border-radius: 6px; font-weight: 600; background: var(--bg); }
+
+        /* Stats Cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 1.25rem; border-radius: var(--radius); }
+        .stat-card span { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase; }
+        .stat-card h3 { font-size: 1.6rem; margin-top: 0.25rem; }
+
+        /* Form Card */
+        .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 2rem; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; }
+        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.25rem; }
+        input, select, button { width: 100%; padding: 0.65rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); }
+        button.btn-submit { background: var(--primary); color: white; border: none; font-weight: 600; cursor: pointer; height: 42px; margin-top: auto; }
+        button.btn-submit:hover { background: var(--primary-hover); }
+
+        /* Category Tabs */
+        .tabs { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.75rem; margin-bottom: 1rem; }
+        .tab-btn { background: var(--surface); border: 1px solid var(--border); padding: 0.5rem 1rem; border-radius: 20px; cursor: pointer; white-space: nowrap; font-weight: 500; font-size: 0.9rem; }
+        .tab-btn.active { background: var(--text-dark); color: white; border-color: var(--text-dark); }
+
+        /* Expense Table */
+        .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.95rem; }
+        th, td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); }
+        th { background: #f1f5f9; color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; }
+        .delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+        .delete-btn:hover { text-decoration: underline; }
+        .pill { display: inline-block; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .pill-p1 { background: #fee2e2; color: #991b1b; }
+        .pill-p2 { background: #e0e7ff; color: #3730a3; }
+        .archived-badge { background: #f1f5f9; color: var(--text-muted); font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <h1>Household Expense Tracker</h1>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">Multi-category monthly ledger with 2-partner balance tracking</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn-action btn-export" onclick="exportToCSV()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export CSV / Excel
+            </button>
+            <button class="btn-action btn-archive" onclick="archiveCurrentMonth()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Archive & Roll Month
+            </button>
+        </div>
+    </header>
+
+    <!-- Month Filter Bar -->
+    <div class="filter-bar">
+        <div>
+            <label for="month-select">Viewing Cycle: </label>
+            <select id="month-select" onchange="onMonthChange(this.value)">
+                <!-- Dynamically populated -->
+            </select>
+        </div>
+        <div id="cycle-status" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">
+            Active Period
+        </div>
+    </div>
+
+    <!-- Overview Metrics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <span>Period Total</span>
+            <h3 id="stat-total">₹0</h3>
+        </div>
+        <div class="stat-card">
+            <span>Paid by Partner 1</span>
+            <h3 id="stat-p1">₹0</h3>
+        </div>
+        <div class="stat-card">
+            <span>Paid by Partner 2</span>
+            <h3 id="stat-p2">₹0</h3>
+        </div>
+    </div>
+
+    <!-- Entry Form -->
+    <div class="form-card">
+        <h2 style="font-size: 1.1rem; margin-bottom: 1rem;">Add New Expense</h2>
+        <form id="expense-form" class="form-grid">
+            <div>
+                <label>Date</label>
+                <input type="date" id="date" required>
+            </div>
+            <div>
+                <label>Category</label>
+                <select id="category" required>
+                    <option value="Groceries">Groceries</option>
+                    <option value="Food & Dining">Food & Dining</option>
+                    <option value="Petrol">Petrol</option>
+                    <option value="Gas / Cylinder">Gas / Cylinder</option>
+                    <option value="Wi-Fi">Wi-Fi</option>
+                    <option value="EMIs">EMIs</option>
+                    <option value="Utilities / Electricity">Utilities / Electricity</option>
+                    <option value="Miscellaneous">Miscellaneous</option>
+                </select>
+            </div>
+            <div>
+                <label>Description</label>
+                <input type="text" id="description" placeholder="e.g. Jio Fiber, Shell fuel" required>
+            </div>
+            <div>
+                <label>Amount (₹)</label>
+                <input type="number" id="amount" step="any" placeholder="0.00" required>
+            </div>
+            <div>
+                <label>Paid By</label>
+                <select id="paid_by" required>
+                    <option value="Partner 1">Partner 1</option>
+                    <option value="Partner 2">Partner 2</option>
+                </select>
+            </div>
+            <div>
+                <button type="submit" class="btn-submit">Add Expense</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Category Tabs Filter -->
+    <div class="tabs" id="category-tabs">
+        <button class="tab-btn active" data-cat="All">All Categories</button>
+        <button class="tab-btn" data-cat="Groceries">Groceries</button>
+        <button class="tab-btn" data-cat="Food & Dining">Food</button>
+        <button class="tab-btn" data-cat="Petrol">Petrol</button>
+        <button class="tab-btn" data-cat="Gas / Cylinder">Gas</button>
+        <button class="tab-btn" data-cat="Wi-Fi">Wi-Fi</button>
+        <button class="tab-btn" data-cat="EMIs">EMIs</button>
+        <button class="tab-btn" data-cat="Utilities / Electricity">Utilities</button>
+    </div>
+
+    <!-- Data Table -->
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Paid By</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="expense-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // --- 1. CONFIGURATION FOR 2-PERSON SYNC ---
+    const SUPABASE_URL = ""; 
+    const SUPABASE_KEY = ""; 
+    const supabase = (SUPABASE_URL && SUPABASE_KEY) ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+    // --- 2. STATE ---
+    let expenses = JSON.parse(localStorage.getItem("local_expenses") || "[]");
+    let activeCategory = "All";
+    
+    // Set default month to current YYYY-MM
+    const today = new Date();
+    const currentMonthKey = today.toISOString().slice(0, 7);
+    let selectedMonth = currentMonthKey;
+
+    document.getElementById('date').valueAsDate = today;
+
+    // --- 3. CORE LOGIC ---
+    async function loadData() {
+        if (supabase) {
+            const { data, error } = await supabase.from('expenses').select('*').order('date', { ascending: false });
+            if (!error && data) expenses = data;
+        }
+        updateMonthDropdown();
+        render();
+    }
+
+    async function addExpense(item) {
+        // Tag with month_year for simple archiving queries
+        const monthYear = item.date.slice(0, 7);
+        const record = { ...item, month_year: monthYear, is_archived: false };
+
+        if (supabase) {
+            await supabase.from('expenses').insert([record]);
+            loadData();
+        } else {
+            expenses.unshift({ ...record, id: Date.now() });
+            localStorage.setItem("local_expenses", JSON.stringify(expenses));
+            updateMonthDropdown();
+            render();
+        }
+    }
+
+    async function deleteExpense(id) {
+        if (!confirm("Are you sure you want to delete this expense?")) return;
+        if (supabase) {
+            await supabase.from('expenses').delete().eq('id', id);
+            loadData();
+        } else {
+            expenses = expenses.filter(e => e.id !== id);
+            localStorage.setItem("local_expenses", JSON.stringify(expenses));
+            render();
+        }
+    }
+
+    // --- 4. ARCHIVE / ROLLOVER LOGIC ---
+    async function archiveCurrentMonth() {
+        const confirmMsg = `Archive all expenses for ${selectedMonth} and start the next monthly cycle?`;
+        if (!confirm(confirmMsg)) return;
+
+        if (supabase) {
+            await supabase.from('expenses')
+                .update({ is_archived: true })
+                .eq('month_year', selectedMonth);
+            loadData();
+        } else {
+            expenses = expenses.map(e => {
+                const itemMonth = e.month_year || e.date.slice(0, 7);
+                if (itemMonth === selectedMonth) {
+                    return { ...e, is_archived: true };
+                }
+                return e;
+            });
+            localStorage.setItem("local_expenses", JSON.stringify(expenses));
+            render();
+        }
+
+        // Advance view to the next calendar month
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const nextDate = new Date(year, month, 1);
+        selectedMonth = nextDate.toISOString().slice(0, 7);
+        updateMonthDropdown();
+        render();
+    }
+
+    // --- 5. EXPORT TO CSV ---
+    function exportToCSV() {
+        const filtered = getFilteredExpenses();
+        if (filtered.length === 0) {
+            alert("No expenses available to export in this view.");
+            return;
+        }
+
+        const headers = ["ID", "Date", "Month", "Category", "Description", "Paid By", "Amount (INR)", "Archived"];
+        const rows = filtered.map(e => [
+            `"${e.id || ''}"`,
+            `"${e.date}"`,
+            `"${e.month_year || e.date.slice(0, 7)}"`,
+            `"${e.category}"`,
+            `"${e.description.replace(/"/g, '""')}"`,
+            `"${e.paid_by}"`,
+            parseFloat(e.amount).toFixed(2),
+            `"${e.is_archived ? 'Yes' : 'No'}"`
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `household_expenses_${selectedMonth}_${activeCategory}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // --- 6. FILTERING & RENDERING ---
+    function getFilteredExpenses() {
+        return expenses.filter(e => {
+            const itemMonth = e.month_year || e.date.slice(0, 7);
+            const matchesMonth = (selectedMonth === 'ALL') || (itemMonth === selectedMonth);
+            const matchesCat = (activeCategory === 'All') || (e.category === activeCategory);
+            return matchesMonth && matchesCat;
+        });
+    }
+
+    function updateMonthDropdown() {
+        const select = document.getElementById('month-select');
+        const monthsSet = new Set();
+        monthsSet.add(currentMonthKey);
+
+        expenses.forEach(e => {
+            const m = e.month_year || e.date.slice(0, 7);
+            if (m) monthsSet.add(m);
+        });
+
+        const sortedMonths = Array.from(monthsSet).sort().reverse();
+        
+        let optionsHtml = `<option value="ALL" ${selectedMonth === 'ALL' ? 'selected' : ''}>All Recorded Months</option>`;
+        sortedMonths.forEach(m => {
+            optionsHtml += `<option value="${m}" ${selectedMonth === m ? 'selected' : ''}>${m}</option>`;
+        });
+
+        select.innerHTML = optionsHtml;
+    }
+
+    function onMonthChange(val) {
+        selectedMonth = val;
+        render();
+    }
+
+    function render() {
+        const tbody = document.getElementById('expense-tbody');
+        tbody.innerHTML = '';
+
+        const filtered = getFilteredExpenses();
+
+        // Calculate Period Totals for currently selected month
+        let total = 0, p1Total = 0, p2Total = 0;
+        filtered.forEach(e => {
+            const amt = parseFloat(e.amount) || 0;
+            total += amt;
+            if (e.paid_by === 'Partner 1') p1Total += amt;
+            if (e.paid_by === 'Partner 2') p2Total += amt;
+        });
+
+        document.getElementById('stat-total').innerText = `₹${total.toLocaleString('en-IN')}`;
+        document.getElementById('stat-p1').innerText = `₹${p1Total.toLocaleString('en-IN')}`;
+        document.getElementById('stat-p2').innerText = `₹${p2Total.toLocaleString('en-IN')}`;
+        
+        const hasArchived = filtered.some(e => e.is_archived);
+        document.getElementById('cycle-status').innerText = hasArchived ? "Contains Archived Records" : "Active Period";
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No entries found for ${selectedMonth} (${activeCategory}).</td></tr>`;
+            return;
+        }
+
+        filtered.forEach(exp => {
+            const tr = document.createElement('tr');
+            const pillClass = exp.paid_by === 'Partner 1' ? 'pill-p1' : 'pill-p2';
+            const statusBadge = exp.is_archived ? `<span class="archived-badge">Archived</span>` : `<span style="color: var(--success); font-weight: 600; font-size: 0.75rem;">Active</span>`;
+
+            tr.innerHTML = `
+                <td>${exp.date}</td>
+                <td><strong>${exp.category}</strong></td>
+                <td>${exp.description}</td>
+                <td><span class="pill ${pillClass}">${exp.paid_by}</span></td>
+                <td>₹${parseFloat(exp.amount).toLocaleString('en-IN')}</td>
+                <td>${statusBadge}</td>
+                <td><button class="delete-btn" onclick="deleteExpense(${typeof exp.id === 'string' ? `'${exp.id}'` : exp.id})">Delete</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // --- 7. EVENT LISTENERS ---
+    document.getElementById('expense-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const item = {
+            date: document.getElementById('date').value,
+            category: document.getElementById('category').value,
+            description: document.getElementById('description').value,
+            amount: parseFloat(document.getElementById('amount').value),
+            paid_by: document.getElementById('paid_by').value
+        };
+        addExpense(item);
+        document.getElementById('description').value = '';
+        document.getElementById('amount').value = '';
+    });
+
+    document.getElementById('category-tabs').addEventListener('click', (e) => {
+        if (!e.target.classList.contains('tab-btn')) return;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        activeCategory = e.target.getAttribute('data-cat');
+        render();
+    });
+
+    // Real-time synchronization subscription (if Supabase is connected)
+    if (supabase) {
+        supabase.channel('public:expenses')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => loadData())
+            .subscribe();
+    }
+
+    loadData();
+</script>
+</body>
+</html>

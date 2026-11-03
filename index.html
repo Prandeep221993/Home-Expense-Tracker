@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Trading Calculator & Journal</title>
+    <style>
+        :root {
+            --bg: #0b0f19;
+            --surface: #111827;
+            --card: #1f2937;
+            --border: #374151;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --profit: #10b981;
+            --loss: #ef4444;
+            --radius: 8px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            padding: 1rem;
+            line-height: 1.5;
+        }
+
+        .container { max-width: 900px; margin: 0 auto; }
+
+        header {
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        h1 { font-size: 1.4rem; font-weight: 700; color: #fff; }
+        p.sub { font-size: 0.85rem; color: var(--text-muted); }
+
+        .btn-export {
+            background-color: #064e3b;
+            color: #6ee7b7;
+            border: 1px solid #047857;
+            padding: 0.45rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Calculator Form */
+        .card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .grid-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.3rem;
+            text-transform: uppercase;
+        }
+
+        input, select {
+            width: 100%;
+            background-color: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.55rem 0.65rem;
+            color: #fff;
+            font-size: 0.95rem;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn-primary {
+            flex: 1;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.7rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .btn-primary:hover { background-color: var(--accent-hover); }
+
+        /* Calculation Preview */
+        .calc-results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 0.75rem;
+            background-color: var(--card);
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            border: 1px solid var(--border);
+        }
+
+        .res-box span { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; display: block; }
+        .res-box strong { font-size: 1.1rem; display: block; margin-top: 0.15rem; }
+
+        .text-profit { color: var(--profit); }
+        .text-loss { color: var(--loss); }
+
+        /* Trade Journal Table */
+        .table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background-color: var(--surface);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 0.75rem 0.85rem;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: #1e293b;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+
+        .tag-buy { background: #064e3b; color: #6ee7b7; padding: 0.2rem 0.4rem; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+        .tag-sell { background: #7f1d1d; color: #fca5a5; padding: 0.2rem 0.4rem; border-radius: 4px; font-weight: 600; font-size: 0.75rem; }
+
+        .del-btn {
+            background: none;
+            border: none;
+            color: var(--loss);
+            cursor: pointer;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <h1>Trading Calculator & Journal</h1>
+            <p class="sub">Risk, Position Size, Target R:R & Net P&amp;L</p>
+        </div>
+        <button class="btn-export" onclick="exportTradesCSV()">Export CSV</button>
+    </header>
+
+    <!-- Calculator Card -->
+    <div class="card">
+        <div class="section-title">
+            <span>Setup &amp; Calculation</span>
+        </div>
+
+        <form id="trade-form">
+            <div class="grid-inputs">
+                <div>
+                    <label>Symbol</label>
+                    <input type="text" id="symbol" placeholder="e.g. NIFTY / RELIANCE" required>
+                </div>
+                <div>
+                    <label>Action</label>
+                    <select id="action" onchange="runCalculation()">
+                        <option value="BUY">BUY / Long</option>
+                        <option value="SELL">SELL / Short</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Quantity</label>
+                    <input type="number" id="qty" placeholder="100" min="1" step="any" required oninput="runCalculation()">
+                </div>
+                <div>
+                    <label>Entry Price (₹)</label>
+                    <input type="number" id="entry" placeholder="2500" step="any" required oninput="runCalculation()">
+                </div>
+                <div>
+                    <label>Stop Loss (₹)</label>
+                    <input type="number" id="sl" placeholder="2450" step="any" required oninput="runCalculation()">
+                </div>
+                <div>
+                    <label>Target Price (₹)</label>
+                    <input type="number" id="target" placeholder="2600" step="any" required oninput="runCalculation()">
+                </div>
+            </div>
+
+            <!-- Dynamic Outputs -->
+            <div class="calc-results">
+                <div class="res-box">
+                    <span>Position Value</span>
+                    <strong id="out-pos-val">₹0</strong>
+                </div>
+                <div class="res-box">
+                    <span>Total Risk (SL)</span>
+                    <strong id="out-risk" class="text-loss">₹0</strong>
+                </div>
+                <div class="res-box">
+                    <span>Potential Gain</span>
+                    <strong id="out-reward" class="text-profit">₹0</strong>
+                </div>
+                <div class="res-box">
+                    <span>Risk:Reward</span>
+                    <strong id="out-rr">1 : 0.0</strong>
+                </div>
+                <div class="res-box">
+                    <span>Est. Taxes &amp; Fees</span>
+                    <strong id="out-charges">₹0</strong>
+                </div>
+                <div class="res-box">
+                    <span>Est. Net Profit</span>
+                    <strong id="out-net" class="text-profit">₹0</strong>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button type="submit" class="btn-primary">Log Trade to Journal</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Trade Journal Table -->
+    <div class="section-title">
+        <span>Logged Trades</span>
+        <button onclick="clearJournal()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:0.8rem;">Clear All</button>
+    </div>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Symbol</th>
+                    <th>Type</th>
+                    <th>Qty</th>
+                    <th>Entry</th>
+                    <th>SL</th>
+                    <th>Target</th>
+                    <th>R:R</th>
+                    <th>Est. Net</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="trade-tbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let trades = JSON.parse(localStorage.getItem('trading_journal') || '[]');
+
+    function runCalculation() {
+        const qty = parseFloat(document.getElementById('qty').value) || 0;
+        const entry = parseFloat(document.getElementById('entry').value) || 0;
+        const sl = parseFloat(document.getElementById('sl').value) || 0;
+        const target = parseFloat(document.getElementById('target').value) || 0;
+        const action = document.getElementById('action').value;
+
+        const posVal = qty * entry;
+        document.getElementById('out-pos-val').innerText = `₹${posVal.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`;
+
+        if (qty <= 0 || entry <= 0) return;
+
+        let riskPerShare = 0;
+        let rewardPerShare = 0;
+
+        if (action === 'BUY') {
+            riskPerShare = sl > 0 ? (entry - sl) : 0;
+            rewardPerShare = target > 0 ? (target - entry) : 0;
+        } else {
+            riskPerShare = sl > 0 ? (sl - entry) : 0;
+            rewardPerShare = target > 0 ? (entry - target) : 0;
+        }
+
+        const totalRisk = Math.max(0, riskPerShare * qty);
+        const totalReward = Math.max(0, rewardPerShare * qty);
+
+        document.getElementById('out-risk').innerText = `₹${totalRisk.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`;
+        document.getElementById('out-reward').innerText = `₹${totalReward.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`;
+
+        const rrRatio = totalRisk > 0 ? (totalReward / totalRisk).toFixed(2) : '0.00';
+        document.getElementById('out-rr').innerText = `1 : ${rrRatio}`;
+
+        // Approx standard Indian equity / derivative turnover fees & STT (~0.05% combined estimate)
+        const estTurnover = (posVal + (qty * (target || entry)));
+        const estCharges = estTurnover * 0.0005 + 40; // Flat ₹40 brokerage (buy+sell) + turnover taxes
+        const estNet = totalReward - estCharges;
+
+        document.getElementById('out-charges').innerText = `₹${estCharges.toFixed(1)}`;
+        const netEl = document.getElementById('out-net');
+        netEl.innerText = `₹${estNet.toLocaleString('en-IN', { maximumFractionDigits: 1 })}`;
+        netEl.className = estNet >= 0 ? 'text-profit' : 'text-loss';
+    }
+
+    function renderJournal() {
+        const tbody = document.getElementById('trade-tbody');
+        tbody.innerHTML = '';
+
+        if (trades.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--text-muted); padding:1.5rem;">No trades logged yet.</td></tr>';
+            return;
+        }
+
+        trades.forEach((t, i) => {
+            const tr = document.createElement('tr');
+            const badge = t.action === 'BUY' ? 'tag-buy' : 'tag-sell';
+            tr.innerHTML = `
+                <td>${t.date}</td>
+                <td><strong>${t.symbol}</strong></td>
+                <td><span class="${badge}">${t.action}</span></td>
+                <td>${t.qty}</td>
+                <td>₹${t.entry}</td>
+                <td>₹${t.sl}</td>
+                <td>₹${t.target}</td>
+                <td>${t.rr}</td>
+                <td class="${t.estNet >= 0 ? 'text-profit' : 'text-loss'}">₹${t.estNet}</td>
+                <td><button class="del-btn" onclick="deleteTrade(${i})">Delete</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById('trade-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const qty = parseFloat(document.getElementById('qty').value) || 0;
+        const entry = parseFloat(document.getElementById('entry').value) || 0;
+        const sl = parseFloat(document.getElementById('sl').value) || 0;
+        const target = parseFloat(document.getElementById('target').value) || 0;
+        const action = document.getElementById('action').value;
+
+        let riskPerShare = action === 'BUY' ? (entry - sl) : (sl - entry);
+        let rewardPerShare = action === 'BUY' ? (target - entry) : (entry - target);
+        const totalRisk = Math.max(0, riskPerShare * qty);
+        const totalReward = Math.max(0, rewardPerShare * qty);
+        const rr = totalRisk > 0 ? (totalReward / totalRisk).toFixed(2) : '0';
+        const charges = ((qty * entry) + (qty * target)) * 0.0005 + 40;
+        const net = Math.round(totalReward - charges);
+
+        trades.unshift({
+            date: new Date().toLocaleDateString('en-GB'),
+            symbol: document.getElementById('symbol').value.toUpperCase(),
+            action,
+            qty,
+            entry,
+            sl,
+            target,
+            rr: `1:${rr}`,
+            estNet: net
+        });
+
+        localStorage.setItem('trading_journal', JSON.stringify(trades));
+        renderJournal();
+        document.getElementById('trade-form').reset();
+        runCalculation();
+    });
+
+    function deleteTrade(index) {
+        trades.splice(index, 1);
+        localStorage.setItem('trading_journal', JSON.stringify(trades));
+        renderJournal();
+    }
+
+    function clearJournal() {
+        if (!confirm('Clear all trade logs?')) return;
+        trades = [];
+        localStorage.removeItem('trading_journal');
+        renderJournal();
+    }
+
+    function exportTradesCSV() {
+        if (trades.length === 0) {
+            alert('No trade data to export.');
+            return;
+        }
+        const headers = ["Date", "Symbol", "Action", "Quantity", "Entry Price", "Stop Loss", "Target", "R:R", "Est Net Profit"];
+        const rows = trades.map(t => [
+            `"${t.date}"`, `"${t.symbol}"`, `"${t.action}"`, t.qty, t.entry, t.sl, t.target, `"${t.rr}"`, t.estNet
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `trading_journal_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    renderJournal();
+</script>
+</body>
+</html>
